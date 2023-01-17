@@ -86,6 +86,10 @@ class OcientEngineSpec(BaseEngineSpec):
 
     engine = 'ocient'
     engine_name = "Ocient"
+    
+    # Ocient does not support CTE in a subquery
+    allows_cte_in_subquery = False
+    
     #limit_method = LimitMethod.WRAP_SQL
     force_column_alias_quotes = True
     max_column_name_length = 30
