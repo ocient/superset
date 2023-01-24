@@ -26,7 +26,6 @@ import pyocient
 from pyocient import _STPoint, _STLinestring, _STPolygon, TypeCodes
 from superset import app
 from superset.models.core import Database
-from superset.models.core import Database
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Optional, Pattern
 
 from superset.models.sql_lab import Query
