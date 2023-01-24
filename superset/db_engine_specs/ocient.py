@@ -27,6 +27,8 @@ from pyocient import _STPoint, _STLinestring, _STPolygon, TypeCodes
 from superset import app
 from superset.models.core import Database
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Optional, Pattern
+
+from superset.models.sql_lab import Query
 # Ensure pyocient inherits Superset's logging level
 superset_log_level = app.config['LOG_LEVEL']
 pyocient.logger.setLevel(superset_log_level)
@@ -61,6 +63,11 @@ TABLE_DOES_NOT_EXIST_REGEX = re.compile(
 COLUMN_DOES_NOT_EXIST_REGEX = re.compile(
     "The reference to column '(?P<column>.*?)' is not valid"
 )
+
+# Store mapping of superset Query id -> cursor object
+# These are inserted into the cache when executing the query
+# They are then removed, either upon cancellation or query completion
+cursor_cache: Dict[Query, pyocient.Cursor]= dict()
 
 # Custom datatype conversion functions
 
@@ -215,32 +222,51 @@ class OcientEngineSpec(BaseEngineSpec):
 
     @classmethod
     def get_table_names(
-        cls, database: "Database", inspector: Inspector, schema: Optional[str]
+        cls, database: Database, inspector: Inspector, schema: Optional[str]
     ) -> List[str]:
         return sorted(inspector.get_table_names(schema))
 
     @classmethod
     def fetch_data(cls, cursor, lim=None):
         rows = super(OcientEngineSpec, cls).fetch_data(cursor)
+                
+        if len(rows) > 0 and type(rows[0]).__name__ == rows:
+            # Peek at the schema to determine which column values, if any,
+            # require sanitization.
+            columns_to_sanitize: List[PlacedSanitizeFunc] = _find_columns_to_sanitize(cursor)
 
-        if (len(rows)) == 0:
-            # No rows were produced
-            return rows
+            if columns_to_sanitize:
+                # At least 1 column has to be sanitized.
+                for row in rows:
+                    for info in columns_to_sanitize:
+                        # Modify the element in-place.
+                        v = row[info.column_index]
+                        row[info.column_index] = info.sanitize_func(v)
 
-        if type(rows[0]).__name__ != 'Row':
-            # TODO what else is returned here?
-            return rows
-
-        # Peek at the schema to determine which column values, if any,
-        # require sanitization.
-        columns_to_sanitize: List[PlacedSanitizeFunc] = _find_columns_to_sanitize(cursor)
-
-        if columns_to_sanitize:
-            # At least 1 column has to be sanitized.
-            for row in rows:
-                for info in columns_to_sanitize:
-                    # Modify the element in-place.
-                    v = row[info.column_index]
-                    row[info.column_index] = info.sanitize_func(v)
-
+        # # We are done with this cursor so we can safely remove it from the cache
+        query_ids_to_delete = [q_id for q_id in cursor_cache if cursor_cache[q_id] == cursor]
+        for q_id in query_ids_to_delete:
+            del cursor_cache[q_id]
         return rows
+
+
+    @classmethod
+    def get_cancel_query_id(cls, cursor: Any, query: Query) -> Optional[str]:
+        cursor_cache[query.id] = cursor
+        
+        # Return a Non-None value
+        # If None is returned, Superset will not call cancel_query
+        return 'DUMMY_VALUE'
+
+    @classmethod
+    def cancel_query(cls, cursor: Any, query: Query, cancel_query_id: str) -> bool:
+
+        if query.id in cursor_cache:
+            cursor.execute(f'CANCEL {cursor_cache[query.id].query_id}')
+            # Query has been cancelled, so we can safely remove the cursor from the cache
+            del cursor_cache[query.id]
+            
+            return True
+        # If the query is not in the cache, it must have either been cancelled elsewhere or completed
+        else:
+            return False
