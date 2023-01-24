@@ -29,8 +29,6 @@ from superset.models.core import Database
 from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Optional, Pattern
 
 from superset.models.sql_lab import Query
-
-from superset.models.sql_lab import Query
 # Ensure pyocient inherits Superset's logging level
 superset_log_level = app.config['LOG_LEVEL']
 pyocient.logger.setLevel(superset_log_level)
@@ -65,11 +63,6 @@ TABLE_DOES_NOT_EXIST_REGEX = re.compile(
 COLUMN_DOES_NOT_EXIST_REGEX = re.compile(
     "The reference to column '(?P<column>.*?)' is not valid"
 )
-
-# Store mapping of superset Query id -> cursor object
-# These are inserted into the cache when executing the query
-# They are then removed, either upon cancellation or query completion
-cursor_cache: Dict[Query, pyocient.Cursor]= dict()
 
 # Store mapping of superset Query id -> cursor object
 # These are inserted into the cache when executing the query
@@ -229,7 +222,6 @@ class OcientEngineSpec(BaseEngineSpec):
 
     @classmethod
     def get_table_names(
-        cls, database: Database, inspector: Inspector, schema: Optional[str]
         cls, database: Database, inspector: Inspector, schema: Optional[str]
     ) -> List[str]:
         return sorted(inspector.get_table_names(schema))
