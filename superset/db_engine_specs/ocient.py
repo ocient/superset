@@ -14,15 +14,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import Any, Dict, List, Optional, Pattern, Tuple, TYPE_CHECKING
-import re
-from typing import Any, Dict, List, Optional, Pattern, Tuple, TYPE_CHECKING
 import re
 
 from sqlalchemy.engine.reflection import Inspector
 from superset.db_engine_specs.base import BaseEngineSpec
-from superset.errors import SupersetErrorType
-from flask_babel import gettext as __
 from superset.errors import SupersetErrorType
 from flask_babel import gettext as __
 
