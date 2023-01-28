@@ -250,9 +250,7 @@ class OcientEngineSpec(BaseEngineSpec):
 
         # # We are done with this cursor so we can safely remove it from the cache
         OcientEngineSpec.query_id_mapping_lock.acquire()
-        query_ids_to_delete = [q_id for q_id in OcientEngineSpec.query_id_mapping if OcientEngineSpec.query_id_mapping[q_id] == cursor.query_id]
-        for q_id in query_ids_to_delete:
-            del OcientEngineSpec.query_id_mapping[q_id]
+        del OcientEngineSpec.query_id_mapping[getattr(cursor, 'superset_query_id')]
         OcientEngineSpec.query_id_mapping_lock.release()
         
         return rows
@@ -270,8 +268,10 @@ class OcientEngineSpec(BaseEngineSpec):
         OcientEngineSpec.query_id_mapping_lock.acquire()
         OcientEngineSpec.query_id_mapping[query.id] = cursor.query_id    
         OcientEngineSpec.query_id_mapping_lock.release()
+        
+        # Add the query id to the cursor
+        setattr(cursor, "superset_query_id", query.id)
         return super().handle_cursor(cursor, query, session)
-    
     @classmethod
     def cancel_query(cls, cursor: Any, query: Query, cancel_query_id: str) -> bool:
         OcientEngineSpec.query_id_mapping_lock.acquire() 
