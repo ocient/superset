@@ -163,7 +163,7 @@ class OcientEngineSpec(BaseEngineSpec):
     # Store mapping of superset Query id -> Ocient ID
     # These are inserted into the cache when executing the query
     # They are then removed, either upon cancellation or query completion
-    query_id_mapping: Dict[Query, pyocient.Cursor]= dict()
+    query_id_mapping: Dict[str, str]= dict()
     query_id_mapping_lock = threading.Lock()
 
     custom_errors : Dict[Pattern[str], Tuple[str, SupersetErrorType, Dict[str, Any]]] = {
@@ -224,16 +224,21 @@ class OcientEngineSpec(BaseEngineSpec):
         "P0.25Y": "ROUND({col}, 'QUARTER')",
         "P1Y": "ROUND({col}, 'YEAR')",
     }
+    
 
     @classmethod
     def get_table_names(
         cls, database: Database, inspector: Inspector, schema: Optional[str]
     ) -> List[str]:
         return sorted(inspector.get_table_names(schema))
+    
 
     @classmethod
     def fetch_data(cls, cursor, lim=None):
-        rows = super(OcientEngineSpec, cls).fetch_data(cursor)
+        try:
+            rows = super(OcientEngineSpec, cls).fetch_data(cursor)
+        except Exception:
+            rows = []
                 
         if len(rows) > 0 and type(rows[0]).__name__ == rows:
             # Peek at the schema to determine which column values, if any,
@@ -249,9 +254,8 @@ class OcientEngineSpec(BaseEngineSpec):
                         row[info.column_index] = info.sanitize_func(v)
 
         # # We are done with this cursor so we can safely remove it from the cache
-        OcientEngineSpec.query_id_mapping_lock.acquire()
-        del OcientEngineSpec.query_id_mapping[getattr(cursor, 'superset_query_id')]
-        OcientEngineSpec.query_id_mapping_lock.release()
+        with OcientEngineSpec.query_id_mapping_lock:
+           del OcientEngineSpec.query_id_mapping[getattr(cursor, 'superset_query_id')]
         
         return rows
 
@@ -265,24 +269,23 @@ class OcientEngineSpec(BaseEngineSpec):
 
     @classmethod
     def handle_cursor(cls, cursor: Any, query: Query, session: Session) -> None:
-        OcientEngineSpec.query_id_mapping_lock.acquire()
-        OcientEngineSpec.query_id_mapping[query.id] = cursor.query_id    
-        OcientEngineSpec.query_id_mapping_lock.release()
+        with OcientEngineSpec.query_id_mapping_lock:
+           OcientEngineSpec.query_id_mapping[query.id] = cursor.query_id    
         
         # Add the query id to the cursor
         setattr(cursor, "superset_query_id", query.id)
         return super().handle_cursor(cursor, query, session)
+    
+    
     @classmethod
     def cancel_query(cls, cursor: Any, query: Query, cancel_query_id: str) -> bool:
-        OcientEngineSpec.query_id_mapping_lock.acquire() 
-        if query.id in OcientEngineSpec.query_id_mapping:
-            cursor.execute(f'CANCEL {OcientEngineSpec.query_id_mapping[query.id]}')
-            # Query has been cancelled, so we can safely remove the cursor from the cache
-            del OcientEngineSpec.query_id_mapping[query.id]
-            OcientEngineSpec.query_id_mapping_lock.release()
+        with OcientEngineSpec.query_id_mapping_lock:
+            if query.id in OcientEngineSpec.query_id_mapping:
+                cursor.execute(f'CANCEL {OcientEngineSpec.query_id_mapping[query.id]}')
+                # Query has been cancelled, so we can safely remove the cursor from the cache
+                del OcientEngineSpec.query_id_mapping[query.id]
 
-            return True
-        # If the query is not in the cache, it must have either been cancelled elsewhere or completed
-        else:
-            OcientEngineSpec.query_id_mapping_lock.release()
-            return False
+                return True
+            # If the query is not in the cache, it must have either been cancelled elsewhere or completed
+            else:
+                return False
