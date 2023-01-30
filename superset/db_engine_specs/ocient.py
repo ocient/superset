@@ -248,18 +248,17 @@ class OcientEngineSpec(BaseEngineSpec):
             # require sanitization.
             columns_to_sanitize: List[PlacedSanitizeFunc] = _find_columns_to_sanitize(cursor)
 
-            if columns_to_sanitize:
-                # At least 1 column has to be sanitized.
-                for row in rows:
-                    for info in columns_to_sanitize:
-                        # Modify the element in-place.
-                        v = row[info.column_index]
-                        row[info.column_index] = info.sanitize_func(v)
-
-        # # We are done with this cursor so we can safely remove it from the cache
-        with OcientEngineSpec.query_id_mapping_lock:
-           del OcientEngineSpec.query_id_mapping[getattr(cursor, 'superset_query_id')]
-        
+        if columns_to_sanitize:
+            # At least 1 column has to be sanitized.
+            def do_nothing(x): 
+                return x
+            
+            sanitization_functions = [do_nothing for _ in range(len(cursor.description))]
+            for info in columns_to_sanitize:
+                sanitization_functions[info.column_index] = info.sanitize_func
+            
+            # Rows from pyocient are given as NamedTuple, so we need to recreate the whole table
+            rows = [[sanitization_functions[i](row[i]) for i in range(len(row))] for row in rows]
         return rows
 
 
