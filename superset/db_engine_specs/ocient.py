@@ -237,10 +237,12 @@ class OcientEngineSpec(BaseEngineSpec):
 
         if columns_to_sanitize:
             # At least 1 column has to be sanitized.
-            for row in rows:
-                for info in columns_to_sanitize:
-                    # Modify the element in-place.
-                    v = row[info.column_index]
-                    row[info.column_index] = info.sanitize_func(v)
-
+            def do_nothing(x): 
+                return x
+            
+            sanitization_functions = [do_nothing for _ in range(len(rows[0]))]
+            for info in columns_to_sanitize:
+                sanitization_functions[info.column_index] = info.sanitize_func
+            
+            rows = [[sanitization_functions[i](row[i]) for i in range(len(row))] for row in rows]
         return rows
