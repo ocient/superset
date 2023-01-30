@@ -237,8 +237,11 @@ class OcientEngineSpec(BaseEngineSpec):
     def fetch_data(cls, cursor, lim=None):
         try:
             rows = super(OcientEngineSpec, cls).fetch_data(cursor)
-        except Exception:
-            rows = []
+        except Exception as exception:
+            with OcientEngineSpec.query_id_mapping_lock:
+                del OcientEngineSpec.query_id_mapping[getattr(cursor, 'superset_query_id')]
+            raise exception
+                
                 
         if len(rows) > 0 and type(rows[0]).__name__ == rows:
             # Peek at the schema to determine which column values, if any,
