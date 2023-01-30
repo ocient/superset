@@ -240,7 +240,7 @@ class OcientEngineSpec(BaseEngineSpec):
             def do_nothing(x): 
                 return x
             
-            sanitization_functions = [do_nothing for _ in range(len(rows[0]))]
+            sanitization_functions = [do_nothing for _ in range(len(cursor.description))]
             for info in columns_to_sanitize:
                 sanitization_functions[info.column_index] = info.sanitize_func
             
