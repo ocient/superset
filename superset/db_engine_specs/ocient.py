@@ -244,5 +244,6 @@ class OcientEngineSpec(BaseEngineSpec):
             for info in columns_to_sanitize:
                 sanitization_functions[info.column_index] = info.sanitize_func
             
+            # Rows from pyocient are given as NamedTuple, so we need to recreate the whole table
             rows = [[sanitization_functions[i](row[i]) for i in range(len(row))] for row in rows]
         return rows
