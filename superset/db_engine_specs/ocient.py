@@ -16,20 +16,19 @@
 # under the License.
 
 import re
-
-from sqlalchemy.engine.reflection import Inspector
-from sqlalchemy.orm import Session
-from superset.db_engine_specs.base import BaseEngineSpec
-from superset.errors import SupersetErrorType
-from flask_babel import gettext as __
+import threading
+from typing import Any, Callable, Dict, List, NamedTuple, Optional, Pattern, Tuple
 
 import pyocient
-from pyocient import _STPoint, _STLinestring, _STPolygon, TypeCodes
-from superset import app
-from superset.models.core import Database
-from typing import Any, Callable, Dict, List, NamedTuple, Tuple, Optional, Pattern
-import threading
+from flask_babel import gettext as __
+from pyocient import _STLinestring, _STPoint, _STPolygon, TypeCodes
+from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.orm import Session
 
+from superset import app
+from superset.db_engine_specs.base import BaseEngineSpec
+from superset.errors import SupersetErrorType
+from superset.models.core import Database
 from superset.models.sql_lab import Query
 
 # Ensure pyocient inherits Superset's logging level
