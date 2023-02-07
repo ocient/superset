@@ -162,7 +162,10 @@ class OcientEngineSpec(BaseEngineSpec):
     # limit_method = LimitMethod.WRAP_SQL
     force_column_alias_quotes = True
     max_column_name_length = 30
-
+    
+    allows_cte_in_subquery = False
+    # Ocient does not support cte names starting with underscores
+    cte_alias = "cte__"
     # Store mapping of superset Query id -> Ocient ID
     # These are inserted into the cache when executing the query
     # They are then removed, either upon cancellation or query completion
