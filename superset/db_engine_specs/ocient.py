@@ -235,8 +235,8 @@ class OcientEngineSpec(BaseEngineSpec):
     @classmethod
     def get_table_names(
         cls, database: Database, inspector: Inspector, schema: Optional[str]
-    ) -> List[str]:
-        return sorted(inspector.get_table_names(schema))
+    ) -> Set[str]:
+        return inspector.get_table_names(schema)
 
     @classmethod
     def fetch_data(cls, cursor, lim=None):
