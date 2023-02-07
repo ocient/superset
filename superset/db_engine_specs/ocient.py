@@ -239,7 +239,9 @@ class OcientEngineSpec(BaseEngineSpec):
         return inspector.get_table_names(schema)
 
     @classmethod
-    def fetch_data(cls, cursor, lim=None):
+    def fetch_data(
+        cls, cursor: Any, lim: Optional[int] = None
+    ) -> List[Tuple[Any, ...]]:
         try:
             rows = super(OcientEngineSpec, cls).fetch_data(cursor)
         except Exception as exception:
