@@ -162,7 +162,7 @@ class OcientEngineSpec(BaseEngineSpec):
     # limit_method = LimitMethod.WRAP_SQL
     force_column_alias_quotes = True
     max_column_name_length = 30
-    
+
     allows_cte_in_subquery = False
     # Ocient does not support cte names starting with underscores
     cte_alias = "cte__"
@@ -263,30 +263,30 @@ class OcientEngineSpec(BaseEngineSpec):
                 cursor
             )
 
-        if columns_to_sanitize:
-            # At least 1 column has to be sanitized.
+            if columns_to_sanitize:
+                # At least 1 column has to be sanitized.
 
-            def identity(x: Any) -> Any:
-                return x
+                def identity(x: Any) -> Any:
+                    return x
 
-            # Use the identity function if the column type doesn't need to be
-            # sanitized.
-            sanitization_functions: List[SanitizeFunc] = [
-                identity for _ in range(len(cursor.description))
-            ]
-            for info in columns_to_sanitize:
-                sanitization_functions[info.column_index] = info.sanitize_func
+                # Use the identity function if the column type doesn't need to be
+                # sanitized.
+                sanitization_functions: List[SanitizeFunc] = [
+                    identity for _ in range(len(cursor.description))
+                ]
+                for info in columns_to_sanitize:
+                    sanitization_functions[info.column_index] = info.sanitize_func
 
-            # pyocient returns a list of NamedTuple objects which represent a
-            # single row. We have to do this copy because that data type is
-            # NamedTuple's are immutable.
-            rows = [
-                tuple(
-                    sanitize_func(val)
-                    for sanitize_func, val in zip(sanitization_functions, row)
-                )
-                for row in rows
-            ]
+                # pyocient returns a list of NamedTuple objects which represent a
+                # single row. We have to do this copy because that data type is
+                # NamedTuple's are immutable.
+                rows = [
+                    tuple(
+                        sanitize_func(val)
+                        for sanitize_func, val in zip(sanitization_functions, row)
+                    )
+                    for row in rows
+                ]
         return rows
 
     @classmethod
