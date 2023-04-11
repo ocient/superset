@@ -17,13 +17,13 @@ pip install sqlalchemy-ocient
 
 ## Connecting to Ocient
 
-The Ocient DSN is of the format:
+The format of the Ocient DSN is:
 
 ```shell
 ocient://user:password@[host][:port][/database][?param1=value1&...]
 ```
 
-The DSN for connecting to an `exampledb` database hosted at `examplehost:4050` with TLS enabled looks like:
+The DSN for connecting to an `exampledb` database hosted at `examplehost:4050` with TLS enabled is:
 ```shell
 ocient://admin:abc123@examplehost:4050/exampledb?tls=on
 ```
