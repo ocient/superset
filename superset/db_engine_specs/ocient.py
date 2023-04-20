@@ -38,10 +38,6 @@ from superset.errors import SupersetErrorType
 from superset.models.core import Database
 from superset.models.sql_lab import Query
 
-# Ensure pyocient inherits Superset's logging level
-superset_log_level = app.config["LOG_LEVEL"]
-pyocient.logger.setLevel(superset_log_level)
-
 
 # Regular expressions to catch custom errors
 
