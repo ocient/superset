@@ -27,7 +27,9 @@ from sqlalchemy.orm import Session
 try:
     # Ensure pyocient inherits Superset's logging level
     import pyocient
+
     from superset import app
+
     superset_log_level = app.config["LOG_LEVEL"]
     pyocient.logger.setLevel(superset_log_level)
 except ImportError as e:
@@ -37,7 +39,6 @@ from superset.db_engine_specs.base import BaseEngineSpec
 from superset.errors import SupersetErrorType
 from superset.models.core import Database
 from superset.models.sql_lab import Query
-
 
 # Regular expressions to catch custom errors
 
@@ -141,6 +142,7 @@ PlacedSanitizeFunc = NamedTuple(
 # Need to try-catch here because pyocient may not be installed
 try:
     from pyocient import TypeCodes
+
     _sanitized_ocient_type_codes: Dict[int, SanitizeFunc] = {
         TypeCodes.BINARY: _to_hex,
         TypeCodes.ST_POINT: _point_to_comma_delimited,
@@ -270,7 +272,7 @@ class OcientEngineSpec(BaseEngineSpec):
             raise exception
 
         # TODO: Unsure if we need to verify that we are receiving rows:
-        if len(rows) > 0 and type(rows[0]).__name__ == 'Row':
+        if len(rows) > 0 and type(rows[0]).__name__ == "Row":
             # Peek at the schema to determine which column values, if any,
             # require sanitization.
             columns_to_sanitize: List[PlacedSanitizeFunc] = _find_columns_to_sanitize(
