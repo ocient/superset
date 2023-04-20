@@ -84,7 +84,7 @@ def _to_hex(data: bytes) -> str:
     return data.hex()
 
 
-def _polygon_to_json(polygon: "_STPolygon") -> str:
+def _polygon_to_json(polygon: Any) -> str:
     """
     Converts the _STPolygon object into its JSON representation.
 
@@ -99,7 +99,7 @@ def _polygon_to_json(polygon: "_STPolygon") -> str:
     return json_value
 
 
-def _linestring_to_json(linestring: "_STLinestring") -> str:
+def _linestring_to_json(linestring: Any) -> str:
     """
     Converts the _STLinestring object into its JSON representation.
 
@@ -109,7 +109,7 @@ def _linestring_to_json(linestring: "_STLinestring") -> str:
     return f"{str([[p.long, p.lat] for p in linestring.points])}"
 
 
-def _point_to_comma_delimited(point: "_STPoint") -> str:
+def _point_to_comma_delimited(point: Any) -> str:
     """
     Returns the x and y coordinates as a comma delimited string.
 
@@ -152,7 +152,7 @@ try:
         TypeCodes.ST_POLYGON: _polygon_to_json,
     }
 except ImportError as e:
-    _sanitized_ocient_type_codes: Dict[int, SanitizeFunc] = {}
+    _sanitized_ocient_type_codes = {}
 
 
 def _find_columns_to_sanitize(cursor: Any) -> List[PlacedSanitizeFunc]:
