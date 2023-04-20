@@ -48,7 +48,7 @@ CONNECTION_INVALID_PASSWORD_REGEX = re.compile(
     r"The userid/password combination was not valid \(Incorrect password for user\)"
 )
 CONNECTION_INVALID_HOSTNAME_REGEX = re.compile(
-    r"Unable to connect to (?P<host>.*?):(?P<port>.*?):"
+    r"Unable to connect to (?P<host>.*?):(?P<port>.*?)"
 )
 CONNECTION_UNKNOWN_DATABASE_REGEX = re.compile(
     r"No database named '(?P<database>.*?)' exists"
@@ -60,7 +60,7 @@ INVALID_CONNECTION_STRING_REGEX = re.compile(
 )
 SYNTAX_ERROR_REGEX = re.compile(
     r"There is a syntax error in your statement \((?P<qualifier>.*?)"
-    r" input '(?P<input>.*?)' expecting {.*}"
+    r" input '(?P<input>.*?)' expecting (?P<expected>.*?)\)"
 )
 TABLE_DOES_NOT_EXIST_REGEX = re.compile(
     r"The referenced table or view '(?P<table>.*?)' does not exist"
@@ -221,7 +221,7 @@ class OcientEngineSpec(BaseEngineSpec):
             {},
         ),
         SYNTAX_ERROR_REGEX: (
-            __('Syntax Error: %(qualifier)s input "%(input)s".'),
+            __('Syntax Error: %(qualifier)s input "%(input)s" expecting "%(expected)s'),
             SupersetErrorType.SYNTAX_ERROR,
             {},
         ),
