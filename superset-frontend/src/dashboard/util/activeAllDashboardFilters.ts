@@ -21,8 +21,7 @@ import {
   PartialFilters,
   JsonObject,
 } from '@superset-ui/core';
-import { ActiveFilters } from '../types';
-import { ChartConfiguration } from '../reducers/types';
+import { ActiveFilters, ChartConfiguration } from '../types';
 
 export const getRelevantDataMask = (
   dataMask: DataMaskStateWithId,
@@ -55,9 +54,13 @@ export const getAllActiveFilters = ({
       chartConfiguration?.[filterId]?.crossFilters?.chartsInScope ??
       allSliceIds ??
       [];
+    const filterType = nativeFilters?.[filterId]?.filterType;
+    const targets = nativeFilters?.[filterId]?.targets ?? scope;
     // Iterate over all roots to find all affected charts
     activeFilters[filterId] = {
       scope,
+      filterType,
+      targets,
       values: extraFormData,
     };
   });

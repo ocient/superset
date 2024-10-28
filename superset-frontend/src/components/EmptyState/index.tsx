@@ -17,7 +17,11 @@
  * under the License.
  */
 
-import React, { ReactNode, SyntheticEvent } from 'react';
+import {
+  ReactNode,
+  SyntheticEvent,
+  MouseEventHandler as ReactMouseEventHandler,
+} from 'react';
 import { styled, css, SupersetTheme, t } from '@superset-ui/core';
 import { Empty } from 'src/components';
 import Button from 'src/components/Button';
@@ -29,14 +33,14 @@ export enum EmptyStateSize {
 }
 
 export interface EmptyStateSmallProps {
-  title: ReactNode;
+  title?: ReactNode;
   description?: ReactNode;
   image?: ReactNode;
 }
 
 export interface EmptyStateProps extends EmptyStateSmallProps {
   buttonText?: ReactNode;
-  buttonAction?: React.MouseEventHandler<HTMLElement>;
+  buttonAction?: ReactMouseEventHandler<HTMLElement>;
   className?: string;
 }
 
@@ -158,11 +162,9 @@ export const EmptyStateBig = ({
   <EmptyStateContainer className={className}>
     {image && <ImageContainer image={image} size={EmptyStateSize.Big} />}
     <TextContainer
-      css={(theme: SupersetTheme) =>
-        css`
-          max-width: ${theme.gridUnit * 150}px;
-        `
-      }
+      css={(theme: SupersetTheme) => css`
+        max-width: ${theme.gridUnit * 150}px;
+      `}
     >
       <BigTitle>{title}</BigTitle>
       {description && <BigDescription>{description}</BigDescription>}
@@ -189,11 +191,9 @@ export const EmptyStateMedium = ({
   <EmptyStateContainer>
     {image && <ImageContainer image={image} size={EmptyStateSize.Medium} />}
     <TextContainer
-      css={(theme: SupersetTheme) =>
-        css`
-          max-width: ${theme.gridUnit * 100}px;
-        `
-      }
+      css={(theme: SupersetTheme) => css`
+        max-width: ${theme.gridUnit * 100}px;
+      `}
     >
       <Title>{title}</Title>
       {description && <Description>{description}</Description>}
@@ -218,11 +218,9 @@ export const EmptyStateSmall = ({
   <EmptyStateContainer>
     {image && <ImageContainer image={image} size={EmptyStateSize.Small} />}
     <TextContainer
-      css={(theme: SupersetTheme) =>
-        css`
-          max-width: ${theme.gridUnit * 75}px;
-        `
-      }
+      css={(theme: SupersetTheme) => css`
+        max-width: ${theme.gridUnit * 75}px;
+      `}
     >
       <Title>{title}</Title>
       {description && <SmallDescription>{description}</SmallDescription>}

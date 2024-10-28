@@ -65,11 +65,13 @@ export interface Metric {
   certification_details?: Maybe<string>;
   certified_by?: Maybe<string>;
   d3format?: Maybe<string>;
+  currency?: Maybe<string>;
   description?: Maybe<string>;
   is_certified?: boolean;
   verbose_name?: string;
   warning_markdown?: Maybe<string>;
   warning_text?: Maybe<string>;
+  error_text?: string;
 }
 
 export function isSavedMetric(metric: any): metric is SavedMetric {

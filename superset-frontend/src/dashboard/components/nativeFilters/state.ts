@@ -83,13 +83,13 @@ function useSelectChartTabParents() {
     const chartLayoutItem = Object.values(dashboardLayout).find(
       layoutItem => layoutItem.meta?.chartId === chartId,
     );
-    return chartLayoutItem?.parents.filter(
-      (parent: string) => dashboardLayout[parent].type === TAB_TYPE,
+    return chartLayoutItem?.parents?.filter(
+      (parent: string) => dashboardLayout[parent]?.type === TAB_TYPE,
     );
   };
 }
 
-function useIsFilterInScope() {
+export function useIsFilterInScope() {
   const activeTabs = useActiveDashboardTabs();
   const selectChartTabParents = useSelectChartTabParents();
 

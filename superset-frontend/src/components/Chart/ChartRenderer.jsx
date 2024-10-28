@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { snakeCase, isEqual } from 'lodash';
+import { snakeCase, isEqual, cloneDeep } from 'lodash';
 import PropTypes from 'prop-types';
-import React from 'react';
+import { createRef, Component } from 'react';
 import {
   SuperChart,
   logging,
@@ -31,7 +31,7 @@ import {
 import { Logger, LOG_ACTIONS_RENDER_CHART } from 'src/logger/LogUtils';
 import { EmptyStateBig, EmptyStateSmall } from 'src/components/EmptyState';
 import { ChartSource } from 'src/types/ChartSource';
-import ChartContextMenu from './ChartContextMenu';
+import ChartContextMenu from './ChartContextMenu/ChartContextMenu';
 
 const propTypes = {
   annotationData: PropTypes.object,
@@ -41,8 +41,8 @@ const propTypes = {
   initialValues: PropTypes.object,
   formData: PropTypes.object.isRequired,
   latestQueryFormData: PropTypes.object,
-  labelColors: PropTypes.object,
-  sharedLabelColors: PropTypes.object,
+  labelsColor: PropTypes.object,
+  labelsColorMap: PropTypes.object,
   height: PropTypes.number,
   width: PropTypes.number,
   setControlValue: PropTypes.func,
@@ -70,7 +70,7 @@ const BLANK = {};
 const BIG_NO_RESULT_MIN_WIDTH = 300;
 const BIG_NO_RESULT_MIN_HEIGHT = 220;
 
-const behaviors = [Behavior.INTERACTIVE_CHART];
+const behaviors = [Behavior.InteractiveChart];
 
 const defaultProps = {
   addFilter: () => BLANK,
@@ -81,18 +81,24 @@ const defaultProps = {
   triggerRender: false,
 };
 
-class ChartRenderer extends React.Component {
+class ChartRenderer extends Component {
   constructor(props) {
     super(props);
+    const suppressContextMenu = getChartMetadataRegistry().get(
+      props.formData.viz_type ?? props.vizType,
+    )?.suppressContextMenu;
     this.state = {
       showContextMenu:
         props.source === ChartSource.Dashboard &&
-        isFeatureEnabled(FeatureFlag.DRILL_TO_DETAIL),
+        !suppressContextMenu &&
+        (isFeatureEnabled(FeatureFlag.DrillToDetail) ||
+          isFeatureEnabled(FeatureFlag.DashboardCrossFilters)),
       inContextMenu: false,
+      legendState: undefined,
     };
     this.hasQueryResponseChange = false;
 
-    this.contextMenuRef = React.createRef();
+    this.contextMenuRef = createRef();
 
     this.handleAddFilter = this.handleAddFilter.bind(this);
     this.handleRenderSuccess = this.handleRenderSuccess.bind(this);
@@ -101,6 +107,7 @@ class ChartRenderer extends React.Component {
     this.handleOnContextMenu = this.handleOnContextMenu.bind(this);
     this.handleContextMenuSelected = this.handleContextMenuSelected.bind(this);
     this.handleContextMenuClosed = this.handleContextMenuClosed.bind(this);
+    this.handleLegendStateChanged = this.handleLegendStateChanged.bind(this);
     this.onContextMenuFallback = this.onContextMenuFallback.bind(this);
 
     this.hooks = {
@@ -112,10 +119,16 @@ class ChartRenderer extends React.Component {
       setControlValue: this.handleSetControlValue,
       onFilterMenuOpen: this.props.onFilterMenuOpen,
       onFilterMenuClose: this.props.onFilterMenuClose,
+      onLegendStateChanged: this.handleLegendStateChanged,
       setDataMask: dataMask => {
         this.props.actions?.updateDataMask(this.props.chartId, dataMask);
       },
     };
+
+    // TODO: queriesResponse comes from Redux store but it's being edited by
+    // the plugins, hence we need to clone it to avoid state mutation
+    // until we change the reducers to use Redux Toolkit with Immer
+    this.mutableQueriesResponse = cloneDeep(this.props.queriesResponse);
   }
 
   shouldComponentUpdate(nextProps, nextState) {
@@ -130,6 +143,11 @@ class ChartRenderer extends React.Component {
       }
       this.hasQueryResponseChange =
         nextProps.queriesResponse !== this.props.queriesResponse;
+
+      if (this.hasQueryResponseChange) {
+        this.mutableQueriesResponse = cloneDeep(nextProps.queriesResponse);
+      }
+
       return (
         this.hasQueryResponseChange ||
         !isEqual(nextProps.datasource, this.props.datasource) ||
@@ -139,8 +157,8 @@ class ChartRenderer extends React.Component {
         nextProps.height !== this.props.height ||
         nextProps.width !== this.props.width ||
         nextProps.triggerRender ||
-        nextProps.labelColors !== this.props.labelColors ||
-        nextProps.sharedLabelColors !== this.props.sharedLabelColors ||
+        nextProps.labelsColor !== this.props.labelsColor ||
+        nextProps.labelsColorMap !== this.props.labelsColorMap ||
         nextProps.formData.color_scheme !== this.props.formData.color_scheme ||
         nextProps.formData.stack !== this.props.formData.stack ||
         nextProps.cacheBusterProp !== this.props.cacheBusterProp ||
@@ -215,6 +233,10 @@ class ChartRenderer extends React.Component {
     this.setState({ inContextMenu: false });
   }
 
+  handleLegendStateChanged(legendState) {
+    this.setState({ legendState });
+  }
+
   // When viz plugins don't handle `contextmenu` event, fallback handler
   // calls `handleOnContextMenu` with no `filters` param.
   onContextMenuFallback(event) {
@@ -245,7 +267,6 @@ class ChartRenderer extends React.Component {
       chartIsStale,
       formData,
       latestQueryFormData,
-      queriesResponse,
       postTransformProps,
     } = this.props;
 
@@ -270,7 +291,7 @@ class ChartRenderer extends React.Component {
             typeof __webpack_require__ !== 'undefined' &&
             // eslint-disable-next-line camelcase, no-undef
             typeof __webpack_require__.h === 'function' &&
-            // eslint-disable-next-line no-undef
+            // eslint-disable-next-line no-undef, camelcase
             __webpack_require__.h()
           }`
         : '';
@@ -302,7 +323,7 @@ class ChartRenderer extends React.Component {
     // Detail props or if it'll cause side-effects (e.g. excessive re-renders).
     const drillToDetailProps = getChartMetadataRegistry()
       .get(formData.viz_type)
-      ?.behaviors.find(behavior => behavior === Behavior.DRILL_TO_DETAIL)
+      ?.behaviors.find(behavior => behavior === Behavior.DrillToDetail)
       ? { inContextMenu: this.state.inContextMenu }
       : {};
 
@@ -338,12 +359,13 @@ class ChartRenderer extends React.Component {
             filterState={filterState}
             hooks={this.hooks}
             behaviors={behaviors}
-            queriesData={queriesResponse}
+            queriesData={this.mutableQueriesResponse}
             onRenderSuccess={this.handleRenderSuccess}
             onRenderFailure={this.handleRenderFailure}
             noResults={noResultsComponent}
             postTransformProps={postTransformProps}
             emitCrossFilters={emitCrossFilters}
+            legendState={this.state.legendState}
             {...drillToDetailProps}
           />
         </div>

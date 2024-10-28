@@ -17,10 +17,10 @@
 import unittest.mock as mock
 from datetime import datetime
 from textwrap import dedent
-from typing import Any, Dict, Optional, Type
+from typing import Any, Optional
 
 import pytest
-from sqlalchemy import column, table, types
+from sqlalchemy import column, table
 from sqlalchemy.dialects import mssql
 from sqlalchemy.dialects.mssql import DATE, NTEXT, NVARCHAR, TEXT, VARCHAR
 from sqlalchemy.sql import select
@@ -32,7 +32,7 @@ from tests.unit_tests.db_engine_specs.utils import (
     assert_column_spec,
     assert_convert_dttm,
 )
-from tests.unit_tests.fixtures.common import dttm
+from tests.unit_tests.fixtures.common import dttm  # noqa: F401
 
 
 @pytest.mark.parametrize(
@@ -50,8 +50,8 @@ from tests.unit_tests.fixtures.common import dttm
 )
 def test_get_column_spec(
     native_type: str,
-    sqla_type: Type[types.TypeEngine],
-    attrs: Optional[Dict[str, Any]],
+    sqla_type: type[TypeEngine],
+    attrs: Optional[dict[str, Any]],
     generic_type: GenericDataType,
     is_dttm: bool,
 ) -> None:
@@ -94,7 +94,7 @@ def test_where_clause_n_prefix() -> None:
     assert query == query_expected
 
 
-def test_time_exp_mixd_case_col_1y() -> None:
+def test_time_exp_mixed_case_col_1y() -> None:
     from superset.db_engine_specs.mssql import MssqlEngineSpec
 
     col = column("MixedCase")
@@ -124,7 +124,7 @@ def test_time_exp_mixd_case_col_1y() -> None:
 def test_convert_dttm(
     target_type: str,
     expected_result: Optional[str],
-    dttm: datetime,
+    dttm: datetime,  # noqa: F811
 ) -> None:
     from superset.db_engine_specs.mssql import MssqlEngineSpec as spec
 
@@ -157,6 +157,14 @@ def test_extract_error_message() -> None:
     assert expected_message == error_message
 
 
+def test_fetch_data_no_description() -> None:
+    from superset.db_engine_specs.mssql import MssqlEngineSpec
+
+    cursor = mock.MagicMock()
+    cursor.description = []
+    assert MssqlEngineSpec.fetch_data(cursor) == []
+
+
 def test_fetch_data() -> None:
     from superset.db_engine_specs.base import BaseEngineSpec
     from superset.db_engine_specs.mssql import MssqlEngineSpec
@@ -166,9 +174,10 @@ def test_fetch_data() -> None:
         "pyodbc_rows_to_tuples",
         return_value="converted",
     ) as mock_pyodbc_rows_to_tuples:
+        cursor = mock.MagicMock()
         data = [(1, "foo")]
         with mock.patch.object(BaseEngineSpec, "fetch_data", return_value=data):
-            result = MssqlEngineSpec.fetch_data(None, 0)
+            result = MssqlEngineSpec.fetch_data(cursor, 0)
             mock_pyodbc_rows_to_tuples.assert_called_once_with(data)
             assert result == "converted"
 
@@ -257,6 +266,7 @@ select TOP 100 * from currency""",
 select TOP 100 * from currency""",
             1000,
         ),
+        ("SELECT DISTINCT x from tbl", "SELECT DISTINCT TOP 100 x from tbl", 100),
         ("SELECT 1 as cnt", "SELECT TOP 10 1 as cnt", 10),
         (
             "select TOP 1000 * from abc where id=1",
@@ -281,14 +291,14 @@ def test_extract_errors() -> None:
     msg = dedent(
         """
 DB-Lib error message 20009, severity 9:
-Unable to connect: Adaptive Server is unavailable or does not exist (locahost)
+Unable to connect: Adaptive Server is unavailable or does not exist (localhost_)
         """
     )
     result = MssqlEngineSpec.extract_errors(Exception(msg))
     assert result == [
         SupersetError(
             error_type=SupersetErrorType.CONNECTION_INVALID_HOSTNAME_ERROR,
-            message='The hostname "locahost" cannot be resolved.',
+            message='The hostname "localhost_" cannot be resolved.',
             level=ErrorLevel.ERROR,
             extra={
                 "engine_name": "Microsoft SQL Server",
@@ -430,3 +440,17 @@ Adaptive Server connection failed (mssqldb.cxiotftzsypc.us-west-2.rds.amazonaws.
             },
         )
     ]
+
+
+@pytest.mark.parametrize(
+    "name,expected_result",
+    [
+        ("col", "col"),
+        ("Col", "Col"),
+        ("COL", "COL"),
+    ],
+)
+def test_denormalize_name(name: str, expected_result: str):
+    from superset.db_engine_specs.mssql import MssqlEngineSpec as spec
+
+    assert spec.denormalize_name(mssql.dialect(), name) == expected_result

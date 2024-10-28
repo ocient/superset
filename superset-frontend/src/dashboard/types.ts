@@ -19,20 +19,23 @@
 import {
   ChartProps,
   DataMaskStateWithId,
+  DatasourceType,
   ExtraFormData,
   GenericDataType,
   JsonObject,
+  NativeFilterScope,
   NativeFiltersState,
 } from '@superset-ui/core';
 import { Dataset } from '@superset-ui/chart-controls';
 import { chart } from 'src/components/Chart/chartReducer';
 import componentTypes from 'src/dashboard/util/componentTypes';
+import Database from 'src/types/Database';
 import { UrlParamEntries } from 'src/utils/urlUtils';
 
 import { UserWithPermissionsAndRoles } from 'src/types/bootstrapTypes';
 import { ChartState } from '../explore/types';
 
-export { Dashboard } from 'src/types/Dashboard';
+export type { Dashboard } from 'src/types/Dashboard';
 
 export type ChartReducerInitialState = typeof chart;
 
@@ -53,9 +56,31 @@ export type Chart = ChartState & {
 };
 
 export enum FilterBarOrientation {
-  VERTICAL = 'VERTICAL',
-  HORIZONTAL = 'HORIZONTAL',
+  Vertical = 'VERTICAL',
+  Horizontal = 'HORIZONTAL',
 }
+
+// chart's cross filter scoping can have its custom value or point to the global configuration
+export const GLOBAL_SCOPE_POINTER = 'global';
+export type GlobalScopePointer = typeof GLOBAL_SCOPE_POINTER;
+export type ChartCrossFiltersConfig = {
+  scope: NativeFilterScope | GlobalScopePointer;
+  chartsInScope: number[];
+};
+export type GlobalChartCrossFilterConfig = {
+  scope: NativeFilterScope;
+  chartsInScope: number[];
+};
+export const isCrossFilterScopeGlobal = (
+  scope: NativeFilterScope | GlobalScopePointer,
+): scope is GlobalScopePointer => scope === GLOBAL_SCOPE_POINTER;
+
+export type ChartConfiguration = {
+  [chartId: number]: {
+    id: number;
+    crossFilters: ChartCrossFiltersConfig;
+  };
+};
 
 export type ActiveTabs = string[];
 export type DashboardLayout = { [key: string]: LayoutItem };
@@ -93,7 +118,6 @@ export type DashboardState = {
 export type DashboardInfo = {
   id: number;
   common: {
-    flash_messages: string[];
     conf: JsonObject;
   };
   userId: string;
@@ -101,8 +125,8 @@ export type DashboardInfo = {
   json_metadata: string;
   metadata: {
     native_filter_configuration: JsonObject;
-    show_native_filters: boolean;
-    chart_configuration: JsonObject;
+    chart_configuration: ChartConfiguration;
+    global_chart_configuration: GlobalChartCrossFilterConfig;
     color_scheme: string;
     color_namespace: string;
     color_scheme_domain: string[];
@@ -120,6 +144,7 @@ export type Datasource = Dataset & {
   uid: string;
   column_types: GenericDataType[];
   table_name: string;
+  database?: Database;
 };
 export type DatasourcesState = {
   [key: string]: Datasource;
@@ -147,12 +172,12 @@ export type Layout = { [key: string]: LayoutItem };
 export type Charts = { [key: number]: Chart };
 
 type ComponentTypesKeys = keyof typeof componentTypes;
-export type ComponentType = typeof componentTypes[ComponentTypesKeys];
+export type ComponentType = (typeof componentTypes)[ComponentTypesKeys];
 
 /** State of dashboardLayout item in redux */
 export type LayoutItem = {
   children: string[];
-  parents: string[];
+  parents?: string[];
   type: ComponentType;
   id: string;
   meta: {
@@ -194,3 +219,53 @@ export type EmbeddedDashboard = {
   dashboard_id: string;
   allowed_domains: string[];
 };
+
+export type Slice = {
+  slice_id: number;
+  slice_name: string;
+  description: string;
+  description_markdown: string;
+  form_data: any;
+  slice_url: string;
+  viz_type: string;
+  thumbnail_url: string;
+  changed_on: number;
+  changed_on_humanized: string;
+  modified: string;
+  datasource_id: number;
+  datasource_type: DatasourceType;
+  datasource_url: string;
+  datasource_name: string;
+  owners: { id: number }[];
+  created_by: { id: number };
+};
+
+export enum MenuKeys {
+  DownloadAsImage = 'download_as_image',
+  ExploreChart = 'explore_chart',
+  ExportCsv = 'export_csv',
+  ExportPivotCsv = 'export_pivot_csv',
+  ExportFullCsv = 'export_full_csv',
+  ExportXlsx = 'export_xlsx',
+  ExportFullXlsx = 'export_full_xlsx',
+  ForceRefresh = 'force_refresh',
+  Fullscreen = 'fullscreen',
+  ToggleChartDescription = 'toggle_chart_description',
+  ViewQuery = 'view_query',
+  ViewResults = 'view_results',
+  DrillToDetail = 'drill_to_detail',
+  CrossFilterScoping = 'cross_filter_scoping',
+  Share = 'share',
+  ShareByEmail = 'share_by_email',
+  CopyLink = 'copy_link',
+  Download = 'download',
+  SaveModal = 'save_modal',
+  RefreshDashboard = 'refresh_dashboard',
+  AutorefreshModal = 'autorefresh_modal',
+  SetFilterMapping = 'set_filter_mapping',
+  EditProperties = 'edit_properties',
+  EditCss = 'edit_css',
+  ToggleFullscreen = 'toggle_fullscreen',
+  ManageEmbedded = 'manage_embedded',
+  ManageEmailReports = 'manage_email_reports',
+}

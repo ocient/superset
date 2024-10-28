@@ -19,19 +19,21 @@ from textwrap import dedent
 from unittest import mock, skipUnless
 
 import pandas as pd
-from sqlalchemy import types
+from flask.ctx import AppContext
+from sqlalchemy import types  # noqa: F401
 from sqlalchemy.sql import select
 
 from superset.db_engine_specs.presto import PrestoEngineSpec
 from superset.errors import ErrorLevel, SupersetError, SupersetErrorType
-from superset.sql_parse import ParsedQuery
+from superset.sql_parse import ParsedQuery, Table
+from superset.utils.database import get_example_database
 from tests.integration_tests.db_engine_specs.base_tests import TestDbEngineSpec
 
 
 class TestPrestoDbEngineSpec(TestDbEngineSpec):
     @skipUnless(TestDbEngineSpec.is_module_installed("pyhive"), "pyhive not installed")
     def test_get_datatype_presto(self):
-        self.assertEqual("STRING", PrestoEngineSpec.get_datatype("string"))
+        assert "STRING" == PrestoEngineSpec.get_datatype("string")
 
     def test_get_view_names_with_schema(self):
         database = mock.MagicMock()
@@ -76,15 +78,18 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
 
     def verify_presto_column(self, column, expected_results):
         inspector = mock.Mock()
-        inspector.engine.dialect.identifier_preparer.quote_identifier = mock.Mock()
+        preparer = inspector.engine.dialect.identifier_preparer
+        preparer.quote_identifier = preparer.quote = preparer.quote_schema = (
+            lambda x: f'"{x}"'
+        )
         row = mock.Mock()
         row.Column, row.Type, row.Null = column
         inspector.bind.execute.return_value.fetchall = mock.Mock(return_value=[row])
-        results = PrestoEngineSpec.get_columns(inspector, "", "")
-        self.assertEqual(len(expected_results), len(results))
+        results = PrestoEngineSpec.get_columns(inspector, Table("", ""))
+        assert len(expected_results) == len(results)
         for expected_result, result in zip(expected_results, results):
-            self.assertEqual(expected_result[0], result["name"])
-            self.assertEqual(expected_result[1], str(result["type"]))
+            assert expected_result[0] == result["column_name"]
+            assert expected_result[1] == str(result["type"])
 
     def test_presto_get_column(self):
         presto_column = ("column_name", "boolean", "")
@@ -173,22 +178,22 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
 
     def test_presto_get_fields(self):
         cols = [
-            {"name": "column"},
-            {"name": "column.nested_obj"},
-            {"name": 'column."quoted.nested obj"'},
+            {"column_name": "column"},
+            {"column_name": "column.nested_obj"},
+            {"column_name": 'column."quoted.nested obj"'},
         ]
         actual_results = PrestoEngineSpec._get_fields(cols)
         expected_results = [
-            {"name": '"column"', "label": "column"},
-            {"name": '"column"."nested_obj"', "label": "column.nested_obj"},
+            {"column_name": '"column"', "label": "column"},
+            {"column_name": '"column"."nested_obj"', "label": "column.nested_obj"},
             {
-                "name": '"column"."quoted.nested obj"',
+                "column_name": '"column"."quoted.nested obj"',
                 "label": 'column."quoted.nested obj"',
             },
         ]
         for actual_result, expected_result in zip(actual_results, expected_results):
-            self.assertEqual(actual_result.element.name, expected_result["name"])
-            self.assertEqual(actual_result.name, expected_result["label"])
+            assert actual_result.element.name == expected_result["column_name"]
+            assert actual_result.name == expected_result["label"]
 
     @mock.patch.dict(
         "superset.extensions.feature_flag_manager._feature_flags",
@@ -197,8 +202,18 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
     )
     def test_presto_expand_data_with_simple_structural_columns(self):
         cols = [
-            {"name": "row_column", "type": "ROW(NESTED_OBJ VARCHAR)", "is_dttm": False},
-            {"name": "array_column", "type": "ARRAY(BIGINT)", "is_dttm": False},
+            {
+                "column_name": "row_column",
+                "name": "row_column",
+                "type": "ROW(NESTED_OBJ VARCHAR)",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "array_column",
+                "name": "array_column",
+                "type": "ARRAY(BIGINT)",
+                "is_dttm": False,
+            },
         ]
         data = [
             {"row_column": ["a"], "array_column": [1, 2, 3]},
@@ -208,9 +223,24 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
             cols, data
         )
         expected_cols = [
-            {"name": "row_column", "type": "ROW(NESTED_OBJ VARCHAR)", "is_dttm": False},
-            {"name": "row_column.nested_obj", "type": "VARCHAR", "is_dttm": False},
-            {"name": "array_column", "type": "ARRAY(BIGINT)", "is_dttm": False},
+            {
+                "column_name": "row_column",
+                "name": "row_column",
+                "type": "ROW(NESTED_OBJ VARCHAR)",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "row_column.nested_obj",
+                "name": "row_column.nested_obj",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "array_column",
+                "name": "array_column",
+                "type": "ARRAY(BIGINT)",
+                "is_dttm": False,
+            },
         ]
 
         expected_data = [
@@ -223,11 +253,16 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         ]
 
         expected_expanded_cols = [
-            {"name": "row_column.nested_obj", "type": "VARCHAR", "is_dttm": False}
+            {
+                "name": "row_column.nested_obj",
+                "column_name": "row_column.nested_obj",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            }
         ]
-        self.assertEqual(actual_cols, expected_cols)
-        self.assertEqual(actual_data, expected_data)
-        self.assertEqual(actual_expanded_cols, expected_expanded_cols)
+        assert actual_cols == expected_cols
+        assert actual_data == expected_data
+        assert actual_expanded_cols == expected_expanded_cols
 
     @mock.patch.dict(
         "superset.extensions.feature_flag_manager._feature_flags",
@@ -238,6 +273,7 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         cols = [
             {
                 "name": "row_column",
+                "column_name": "row_column",
                 "type": "ROW(NESTED_OBJ1 VARCHAR, NESTED_ROW ROW(NESTED_OBJ2 VARCHAR))",
                 "is_dttm": False,
             }
@@ -249,17 +285,25 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         expected_cols = [
             {
                 "name": "row_column",
+                "column_name": "row_column",
                 "type": "ROW(NESTED_OBJ1 VARCHAR, NESTED_ROW ROW(NESTED_OBJ2 VARCHAR))",
                 "is_dttm": False,
             },
-            {"name": "row_column.nested_obj1", "type": "VARCHAR", "is_dttm": False},
+            {
+                "name": "row_column.nested_obj1",
+                "column_name": "row_column.nested_obj1",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
             {
                 "name": "row_column.nested_row",
+                "column_name": "row_column.nested_row",
                 "type": "ROW(NESTED_OBJ2 VARCHAR)",
                 "is_dttm": False,
             },
             {
                 "name": "row_column.nested_row.nested_obj2",
+                "column_name": "row_column.nested_row.nested_obj2",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
@@ -280,21 +324,28 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         ]
 
         expected_expanded_cols = [
-            {"name": "row_column.nested_obj1", "type": "VARCHAR", "is_dttm": False},
+            {
+                "name": "row_column.nested_obj1",
+                "column_name": "row_column.nested_obj1",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
             {
                 "name": "row_column.nested_row",
+                "column_name": "row_column.nested_row",
                 "type": "ROW(NESTED_OBJ2 VARCHAR)",
                 "is_dttm": False,
             },
             {
                 "name": "row_column.nested_row.nested_obj2",
+                "column_name": "row_column.nested_row.nested_obj2",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
         ]
-        self.assertEqual(actual_cols, expected_cols)
-        self.assertEqual(actual_data, expected_data)
-        self.assertEqual(actual_expanded_cols, expected_expanded_cols)
+        assert actual_cols == expected_cols
+        assert actual_data == expected_data
+        assert actual_expanded_cols == expected_expanded_cols
 
     @mock.patch.dict(
         "superset.extensions.feature_flag_manager._feature_flags",
@@ -305,6 +356,7 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         cols = [
             {
                 "name": "row_column",
+                "column_name": "row_column",
                 "type": "ROW(NESTED_ROW ROW(NESTED_OBJ VARCHAR))",
                 "is_dttm": False,
             }
@@ -321,16 +373,19 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         expected_cols = [
             {
                 "name": "row_column",
+                "column_name": "row_column",
                 "type": "ROW(NESTED_ROW ROW(NESTED_OBJ VARCHAR))",
                 "is_dttm": False,
             },
             {
                 "name": "row_column.nested_row",
+                "column_name": "row_column.nested_row",
                 "type": "ROW(NESTED_OBJ VARCHAR)",
                 "is_dttm": False,
             },
             {
                 "name": "row_column.nested_row.nested_obj",
+                "column_name": "row_column.nested_row.nested_obj",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
@@ -361,18 +416,20 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         expected_expanded_cols = [
             {
                 "name": "row_column.nested_row",
+                "column_name": "row_column.nested_row",
                 "type": "ROW(NESTED_OBJ VARCHAR)",
                 "is_dttm": False,
             },
             {
                 "name": "row_column.nested_row.nested_obj",
+                "column_name": "row_column.nested_row.nested_obj",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
         ]
-        self.assertEqual(actual_cols, expected_cols)
-        self.assertEqual(actual_data, expected_data)
-        self.assertEqual(actual_expanded_cols, expected_expanded_cols)
+        assert actual_cols == expected_cols
+        assert actual_data == expected_data
+        assert actual_expanded_cols == expected_expanded_cols
 
     @mock.patch.dict(
         "superset.extensions.feature_flag_manager._feature_flags",
@@ -381,9 +438,15 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
     )
     def test_presto_expand_data_with_complex_array_columns(self):
         cols = [
-            {"name": "int_column", "type": "BIGINT", "is_dttm": False},
+            {
+                "name": "int_column",
+                "column_name": "int_column",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
             {
                 "name": "array_column",
+                "column_name": "array_column",
                 "type": "ARRAY(ROW(NESTED_ARRAY ARRAY(ROW(NESTED_OBJ VARCHAR))))",
                 "is_dttm": False,
             },
@@ -396,19 +459,27 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
             cols, data
         )
         expected_cols = [
-            {"name": "int_column", "type": "BIGINT", "is_dttm": False},
+            {
+                "name": "int_column",
+                "column_name": "int_column",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
             {
                 "name": "array_column",
+                "column_name": "array_column",
                 "type": "ARRAY(ROW(NESTED_ARRAY ARRAY(ROW(NESTED_OBJ VARCHAR))))",
                 "is_dttm": False,
             },
             {
                 "name": "array_column.nested_array",
+                "column_name": "array_column.nested_array",
                 "type": "ARRAY(ROW(NESTED_OBJ VARCHAR))",
                 "is_dttm": False,
             },
             {
                 "name": "array_column.nested_array.nested_obj",
+                "column_name": "array_column.nested_array.nested_obj",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
@@ -466,27 +537,34 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         expected_expanded_cols = [
             {
                 "name": "array_column.nested_array",
+                "column_name": "array_column.nested_array",
                 "type": "ARRAY(ROW(NESTED_OBJ VARCHAR))",
                 "is_dttm": False,
             },
             {
                 "name": "array_column.nested_array.nested_obj",
+                "column_name": "array_column.nested_array.nested_obj",
                 "type": "VARCHAR",
                 "is_dttm": False,
             },
         ]
-        self.assertEqual(actual_cols, expected_cols)
-        self.assertEqual(actual_data, expected_data)
-        self.assertEqual(actual_expanded_cols, expected_expanded_cols)
+        assert actual_cols == expected_cols
+        assert actual_data == expected_data
+        assert actual_expanded_cols == expected_expanded_cols
 
-    def test_presto_extra_table_metadata(self):
-        db = mock.Mock()
-        db.get_indexes = mock.Mock(return_value=[{"column_names": ["ds", "hour"]}])
-        db.get_extra = mock.Mock(return_value={})
+    def test_presto_get_extra_table_metadata(self):
+        database = mock.Mock()
+        database.get_indexes = mock.Mock(
+            return_value=[{"column_names": ["ds", "hour"]}]
+        )
+        database.get_extra = mock.Mock(return_value={})
         df = pd.DataFrame({"ds": ["01-01-19"], "hour": [1]})
-        db.get_df = mock.Mock(return_value=df)
+        database.get_df = mock.Mock(return_value=df)
         PrestoEngineSpec.get_create_view = mock.Mock(return_value=None)
-        result = PrestoEngineSpec.extra_table_metadata(db, "test_table", "test_schema")
+        result = PrestoEngineSpec.get_extra_table_metadata(
+            database,
+            Table("test_table", "test_schema"),
+        )
         assert result["partitions"]["cols"] == ["ds", "hour"]
         assert result["partitions"]["latest"] == {"ds": "01-01-19", "hour": 1}
 
@@ -498,10 +576,13 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         db.get_df = mock.Mock(return_value=df)
         columns = [{"name": "ds"}, {"name": "hour"}]
         result = PrestoEngineSpec.where_latest_partition(
-            "test_table", "test_schema", db, select(), columns
+            db,
+            Table("test_table", "test_schema"),
+            select(),
+            columns,
         )
         query_result = str(result.compile(compile_kwargs={"literal_binds": True}))
-        self.assertEqual("SELECT  \nWHERE ds = '01-01-19' AND hour = 1", query_result)
+        assert "SELECT  \nWHERE ds = '01-01-19' AND hour = 1" == query_result
 
     def test_query_cost_formatter(self):
         raw_cost = [
@@ -564,7 +645,7 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
                 "Network cost": "354 G",
             }
         ]
-        self.assertEqual(formatted_cost, expected)
+        assert formatted_cost == expected
 
     @mock.patch.dict(
         "superset.extensions.feature_flag_manager._feature_flags",
@@ -573,9 +654,20 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
     )
     def test_presto_expand_data_array(self):
         cols = [
-            {"name": "event_id", "type": "VARCHAR", "is_dttm": False},
-            {"name": "timestamp", "type": "BIGINT", "is_dttm": False},
             {
+                "column_name": "event_id",
+                "name": "event_id",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "timestamp",
+                "name": "timestamp",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user",
                 "name": "user",
                 "type": "ROW(ID BIGINT, FIRST_NAME VARCHAR, LAST_NAME VARCHAR)",
                 "is_dttm": False,
@@ -592,16 +684,42 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
             cols, data
         )
         expected_cols = [
-            {"name": "event_id", "type": "VARCHAR", "is_dttm": False},
-            {"name": "timestamp", "type": "BIGINT", "is_dttm": False},
             {
+                "column_name": "event_id",
+                "name": "event_id",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "timestamp",
+                "name": "timestamp",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user",
                 "name": "user",
                 "type": "ROW(ID BIGINT, FIRST_NAME VARCHAR, LAST_NAME VARCHAR)",
                 "is_dttm": False,
             },
-            {"name": "user.id", "type": "BIGINT", "is_dttm": False},
-            {"name": "user.first_name", "type": "VARCHAR", "is_dttm": False},
-            {"name": "user.last_name", "type": "VARCHAR", "is_dttm": False},
+            {
+                "column_name": "user.id",
+                "name": "user.id",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user.first_name",
+                "name": "user.first_name",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user.last_name",
+                "name": "user.last_name",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
         ]
         expected_data = [
             {
@@ -614,14 +732,29 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
             }
         ]
         expected_expanded_cols = [
-            {"name": "user.id", "type": "BIGINT", "is_dttm": False},
-            {"name": "user.first_name", "type": "VARCHAR", "is_dttm": False},
-            {"name": "user.last_name", "type": "VARCHAR", "is_dttm": False},
+            {
+                "column_name": "user.id",
+                "name": "user.id",
+                "type": "BIGINT",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user.first_name",
+                "name": "user.first_name",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
+            {
+                "column_name": "user.last_name",
+                "name": "user.last_name",
+                "type": "VARCHAR",
+                "is_dttm": False,
+            },
         ]
 
-        self.assertEqual(actual_cols, expected_cols)
-        self.assertEqual(actual_data, expected_data)
-        self.assertEqual(actual_expanded_cols, expected_expanded_cols)
+        assert actual_cols == expected_cols
+        assert actual_data == expected_data
+        assert actual_expanded_cols == expected_expanded_cols
 
     @mock.patch("superset.db_engine_specs.base.BaseEngineSpec.get_table_names")
     @mock.patch("superset.db_engine_specs.presto.PrestoEngineSpec.get_view_names")
@@ -668,14 +801,15 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
 
     def test_show_columns(self):
         inspector = mock.MagicMock()
-        inspector.engine.dialect.identifier_preparer.quote_identifier = (
+        preparer = inspector.engine.dialect.identifier_preparer
+        preparer.quote_identifier = preparer.quote = preparer.quote_schema = (
             lambda x: f'"{x}"'
         )
         inspector.bind.execute.return_value.fetchall = mock.MagicMock(
             return_value=["a", "b"]
         )
         table_name = "table_name"
-        result = PrestoEngineSpec._show_columns(inspector, table_name, None)
+        result = PrestoEngineSpec._show_columns(inspector, Table(table_name))
         assert result == ["a", "b"]
         inspector.bind.execute.assert_called_once_with(
             f'SHOW COLUMNS FROM "{table_name}"'
@@ -683,7 +817,8 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
 
     def test_show_columns_with_schema(self):
         inspector = mock.MagicMock()
-        inspector.engine.dialect.identifier_preparer.quote_identifier = (
+        preparer = inspector.engine.dialect.identifier_preparer
+        preparer.quote_identifier = preparer.quote = preparer.quote_schema = (
             lambda x: f'"{x}"'
         )
         inspector.bind.execute.return_value.fetchall = mock.MagicMock(
@@ -691,7 +826,7 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         )
         table_name = "table_name"
         schema = "schema"
-        result = PrestoEngineSpec._show_columns(inspector, table_name, schema)
+        result = PrestoEngineSpec._show_columns(inspector, Table(table_name, schema))
         assert result == ["a", "b"]
         inspector.bind.execute.assert_called_once_with(
             f'SHOW COLUMNS FROM "{schema}"."{table_name}"'
@@ -719,9 +854,16 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
             {"col1": "val1"},
             {"col2": "val2"},
         ]
-        PrestoEngineSpec.select_star(database, table_name, engine, cols=cols)
+        PrestoEngineSpec.select_star(database, Table(table_name), engine, cols=cols)
         mock_select_star.assert_called_once_with(
-            database, table_name, engine, None, 100, False, True, True, cols
+            database,
+            Table(table_name),
+            engine,
+            100,
+            False,
+            True,
+            True,
+            cols,
         )
 
     @mock.patch("superset.db_engine_specs.presto.is_feature_enabled")
@@ -734,28 +876,31 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         table_name = "table_name"
         engine = mock.Mock()
         cols = [
-            {"name": "val1"},
-            {"name": "val2<?!@#$312,/'][p098"},
-            {"name": ".val2"},
-            {"name": "val2."},
-            {"name": "val.2"},
-            {"name": ".val2."},
+            {"column_name": "val1"},
+            {"column_name": "val2<?!@#$312,/'][p098"},
+            {"column_name": ".val2"},
+            {"column_name": "val2."},
+            {"column_name": "val.2"},
+            {"column_name": ".val2."},
         ]
         PrestoEngineSpec.select_star(
-            database, table_name, engine, show_cols=True, cols=cols
+            database,
+            Table(table_name),
+            engine,
+            show_cols=True,
+            cols=cols,
         )
         mock_select_star.assert_called_once_with(
             database,
-            table_name,
+            Table(table_name),
             engine,
-            None,
             100,
             True,
             True,
             True,
             [
-                {"name": "val1"},
-                {"name": "val2<?!@#$312,/'][p098"},
+                {"column_name": "val1"},
+                {"column_name": "val2<?!@#$312,/'][p098"},
             ],
         )
 
@@ -803,9 +948,11 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
     def test_get_create_view_database_error(self):
         from pyhive.exc import DatabaseError
 
-        mock_execute = mock.MagicMock(side_effect=DatabaseError())
+        mock_execute = mock.MagicMock()
+        mock_fetch_data = mock.MagicMock(side_effect=DatabaseError())
         database = mock.MagicMock()
         database.get_raw_connection().__enter__().cursor().execute = mock_execute
+        database.get_raw_connection().__enter__().cursor().fetchall = mock_fetch_data
         schema = "schema"
         table = "table"
         result = PrestoEngineSpec.get_create_view(database, schema=schema, table=table)
@@ -821,7 +968,7 @@ class TestPrestoDbEngineSpec(TestDbEngineSpec):
         result = PrestoEngineSpec._extract_error_message(exception)
         assert result == "name at location: msg"
 
-    def test_extract_error_message_db_errr(self):
+    def test_extract_error_message_db_error(self):
         from pyhive.exc import DatabaseError
 
         exception = DatabaseError({"message": "Err message"})
@@ -1032,3 +1179,22 @@ def test_is_readonly():
     assert is_readonly("EXPLAIN SELECT 1")
     assert is_readonly("SELECT 1")
     assert is_readonly("WITH (SELECT 1) bla SELECT * from bla")
+
+
+def test_get_catalog_names(app_context: AppContext) -> None:
+    """
+    Test the ``get_catalog_names`` method.
+    """
+    database = get_example_database()
+
+    if database.backend != "presto":
+        return
+
+    with database.get_inspector() as inspector:
+        assert PrestoEngineSpec.get_catalog_names(database, inspector) == [
+            "jmx",
+            "memory",
+            "system",
+            "tpcds",
+            "tpch",
+        ]
