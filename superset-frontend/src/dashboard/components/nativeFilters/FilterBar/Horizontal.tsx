@@ -17,21 +17,31 @@
  * under the License.
  */
 
-import React from 'react';
-import { styled, t } from '@superset-ui/core';
+import { FC, memo } from 'react';
+import {
+  DataMaskStateWithId,
+  FeatureFlag,
+  isFeatureEnabled,
+  JsonObject,
+  styled,
+  t,
+} from '@superset-ui/core';
 import Icons from 'src/components/Icons';
 import Loading from 'src/components/Loading';
+import { DashboardLayout, RootState } from 'src/dashboard/types';
+import { useSelector } from 'react-redux';
 import FilterControls from './FilterControls/FilterControls';
-import { getFilterBarTestId } from './utils';
+import { useChartsVerboseMaps, getFilterBarTestId } from './utils';
 import { HorizontalBarProps } from './types';
 import FilterBarSettings from './FilterBarSettings';
 import FilterConfigurationLink from './FilterConfigurationLink';
+import crossFiltersSelector from './CrossFilters/selectors';
 
 const HorizontalBar = styled.div`
   ${({ theme }) => `
     padding: ${theme.gridUnit * 3}px ${theme.gridUnit * 2}px ${
-    theme.gridUnit * 3
-  }px ${theme.gridUnit * 4}px;
+      theme.gridUnit * 3
+    }px ${theme.gridUnit * 4}px;
     background: ${theme.colors.grayscale.light5};
     box-shadow: inset 0px -2px 2px -1px ${theme.colors.grayscale.light2};
   `}
@@ -86,17 +96,38 @@ const FiltersLinkContainer = styled.div<{ hasFilters: boolean }>`
   `}
 `;
 
-const HorizontalFilterBar: React.FC<HorizontalBarProps> = ({
+const HorizontalFilterBar: FC<HorizontalBarProps> = ({
   actions,
   canEdit,
   dashboardId,
   dataMaskSelected,
   filterValues,
   isInitialized,
-  focusedFilterId,
   onSelectionChange,
 }) => {
-  const hasFilters = filterValues.length > 0;
+  const dataMask = useSelector<RootState, DataMaskStateWithId>(
+    state => state.dataMask,
+  );
+  const chartConfiguration = useSelector<RootState, JsonObject>(
+    state => state.dashboardInfo.metadata?.chart_configuration,
+  );
+  const dashboardLayout = useSelector<RootState, DashboardLayout>(
+    state => state.dashboardLayout.present,
+  );
+  const isCrossFiltersEnabled = isFeatureEnabled(
+    FeatureFlag.DashboardCrossFilters,
+  );
+  const verboseMaps = useChartsVerboseMaps();
+
+  const selectedCrossFilters = isCrossFiltersEnabled
+    ? crossFiltersSelector({
+        dataMask,
+        chartConfiguration,
+        dashboardLayout,
+        verboseMaps,
+      })
+    : [];
+  const hasFilters = filterValues.length > 0 || selectedCrossFilters.length > 0;
 
   return (
     <HorizontalBar {...getFilterBarTestId()}>
@@ -124,7 +155,6 @@ const HorizontalFilterBar: React.FC<HorizontalBarProps> = ({
             {hasFilters && (
               <FilterControls
                 dataMaskSelected={dataMaskSelected}
-                focusedFilterId={focusedFilterId}
                 onFilterSelectionChange={onSelectionChange}
               />
             )}
@@ -135,4 +165,4 @@ const HorizontalFilterBar: React.FC<HorizontalBarProps> = ({
     </HorizontalBar>
   );
 };
-export default React.memo(HorizontalFilterBar);
+export default memo(HorizontalFilterBar);

@@ -17,13 +17,12 @@
  * under the License.
  */
 
-import React from 'react';
 import * as reactRedux from 'react-redux';
 import { Filter, NativeFilterType } from '@superset-ui/core';
 import userEvent from '@testing-library/user-event';
 import { render, screen } from 'spec/helpers/testing-library';
 import { DASHBOARD_ROOT_ID } from 'src/dashboard/util/constants';
-import { SET_FOCUSED_NATIVE_FILTER } from 'src/dashboard/actions/nativeFilters';
+import { SET_DIRECT_PATH } from 'src/dashboard/actions/dashboardState';
 import { FilterCardContent } from './FilterCardContent';
 
 const baseInitialState = {
@@ -49,7 +48,7 @@ const baseInitialState = {
           rootPath: [DASHBOARD_ROOT_ID],
           excluded: [],
         },
-        type: NativeFilterType.NATIVE_FILTER,
+        type: NativeFilterType.NativeFilter,
         description: '',
       },
       'NATIVE_FILTER-2': {
@@ -71,7 +70,7 @@ const baseInitialState = {
           rootPath: [DASHBOARD_ROOT_ID],
           excluded: [],
         },
-        type: NativeFilterType.NATIVE_FILTER,
+        type: NativeFilterType.NativeFilter,
         description: '',
       },
     },
@@ -188,7 +187,7 @@ const baseFilter: Filter = {
     rootPath: [DASHBOARD_ROOT_ID],
     excluded: [],
   },
-  type: NativeFilterType.NATIVE_FILTER,
+  type: NativeFilterType.NativeFilter,
   description: '',
 };
 
@@ -204,13 +203,6 @@ jest.mock('@superset-ui/core', () => ({
     },
   }),
 }));
-
-jest.mock(
-  'src/components/Icons/Icon',
-  () =>
-    ({ fileName }: { fileName: string }) =>
-      <span role="img" aria-label={fileName.replace('_', '-')} />,
-);
 
 // extract text from embedded html tags
 // source: https://polvara.me/posts/five-things-you-didnt-know-about-testing-library
@@ -304,8 +296,8 @@ test('focus filter on filter card dependency click', () => {
 
   userEvent.click(screen.getByText('Native filter 2'));
   expect(dummyDispatch).toHaveBeenCalledWith({
-    type: SET_FOCUSED_NATIVE_FILTER,
-    id: 'NATIVE_FILTER-2',
+    type: SET_DIRECT_PATH,
+    path: ['NATIVE_FILTER-2'],
   });
 });
 

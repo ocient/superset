@@ -18,7 +18,7 @@
  */
 /* eslint-disable camelcase */
 /* eslint prefer-const: 2 */
-import shortid from 'shortid';
+import { nanoid } from 'nanoid';
 import { SupersetClient } from '@superset-ui/core';
 
 import { safeStringify } from '../utils/safeStringify';
@@ -72,7 +72,7 @@ const loggerMiddleware = store => next => action => {
     return next(action);
   }
 
-  const { dashboardInfo, explore, impressionId, dashboardLayout } =
+  const { dashboardInfo, explore, impressionId, dashboardLayout, sqlLab } =
     store.getState();
   let logMetadata = {
     impression_id: impressionId,
@@ -89,6 +89,16 @@ const loggerMiddleware = store => next => action => {
       source: 'explore',
       source_id: explore.slice ? explore.slice.slice_id : 0,
       ...logMetadata,
+    };
+  } else if (sqlLab) {
+    const editor = sqlLab.queryEditors.find(
+      ({ id }) => id === sqlLab.tabHistory.slice(-1)[0],
+    );
+    logMetadata = {
+      source: 'sqlLab',
+      source_id: editor?.id,
+      db_id: editor?.dbId,
+      schema: editor?.schema,
     };
   }
 
@@ -107,7 +117,7 @@ const loggerMiddleware = store => next => action => {
       trigger_event: lastEventId,
     };
   } else {
-    lastEventId = shortid.generate();
+    lastEventId = nanoid();
     eventData = {
       ...eventData,
       event_type: 'user',

@@ -51,7 +51,8 @@ describe('controlUtils', () => {
       type: DatasourceType.Table,
       columns: [{ column_name: 'a' }],
       metrics: [{ metric_name: 'first' }, { metric_name: 'second' }],
-      column_format: {},
+      column_formats: {},
+      currency_formats: {},
       verbose_map: {},
       main_dttm_col: '',
       datasource_name: '1__table',
@@ -155,7 +156,7 @@ describe('controlUtils', () => {
       expect(control?.value).toBeNull();
     });
 
-    it('returns null for non-existent field', () => {
+    it('returns null for nonexistent field', () => {
       const control = getControlState('NON_EXISTENT', 'table', state);
       expect(control).toBeNull();
     });

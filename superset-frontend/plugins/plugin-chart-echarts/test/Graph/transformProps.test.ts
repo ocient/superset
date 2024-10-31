@@ -71,6 +71,7 @@ describe('EchartsGraph transformProps', () => {
             expect.objectContaining({
               data: [
                 {
+                  col: 'source_column',
                   category: undefined,
                   id: '0',
                   label: { show: true },
@@ -80,14 +81,11 @@ describe('EchartsGraph transformProps', () => {
                     label: { fontWeight: 'bolder' },
                   },
                   symbolSize: 50,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   value: 6,
                 },
                 {
+                  col: 'target_column',
                   category: undefined,
                   id: '1',
                   label: { show: true },
@@ -97,14 +95,11 @@ describe('EchartsGraph transformProps', () => {
                     label: { fontWeight: 'bolder' },
                   },
                   symbolSize: 50,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   value: 6,
                 },
                 {
+                  col: 'source_column',
                   category: undefined,
                   id: '2',
                   label: { show: true },
@@ -114,14 +109,11 @@ describe('EchartsGraph transformProps', () => {
                     label: { fontWeight: 'bolder' },
                   },
                   symbolSize: 10,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   value: 5,
                 },
                 {
+                  col: 'target_column',
                   category: undefined,
                   id: '3',
                   label: { show: true },
@@ -131,11 +123,7 @@ describe('EchartsGraph transformProps', () => {
                     label: { fontWeight: 'bolder' },
                   },
                   symbolSize: 10,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   value: 5,
                 },
               ],
@@ -168,7 +156,7 @@ describe('EchartsGraph transformProps', () => {
     );
   });
 
-  it('should transform chart props for viz with category and falsey normalization', () => {
+  it('should transform chart props for viz with category and falsy normalization', () => {
     const formData: SqlaFormData = {
       colorScheme: 'bnbColors',
       datasource: '3__table',
@@ -229,30 +217,24 @@ describe('EchartsGraph transformProps', () => {
               data: [
                 {
                   id: '0',
+                  col: 'source_column',
                   name: 'source_value',
                   value: 11,
                   symbolSize: 10,
                   category: 'category_value_1',
                   select: DEFAULT_GRAPH_SERIES_OPTION.select,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   label: { show: true },
                 },
                 {
                   id: '1',
+                  col: 'target_column',
                   name: 'target_value',
                   value: 11,
                   symbolSize: 10,
                   category: 'category_value_2',
                   select: DEFAULT_GRAPH_SERIES_OPTION.select,
-                  tooltip: {
-                    appendToBody: true,
-                    formatter: '{b}: {c}',
-                    position: expect.anything(),
-                  },
+                  tooltip: expect.anything(),
                   label: { show: true },
                 },
               ],

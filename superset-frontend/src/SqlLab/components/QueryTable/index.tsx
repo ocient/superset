@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import moment from 'moment';
 import Card from 'src/components/Card';
 import ProgressBar from 'src/components/ProgressBar';
@@ -25,7 +25,7 @@ import { t, useTheme, QueryResponse } from '@superset-ui/core';
 import { useDispatch, useSelector } from 'react-redux';
 
 import {
-  queryEditorSetAndSaveSql,
+  queryEditorSetSql,
   cloneQueryToNewTab,
   fetchQueryResults,
   clearQueryResults,
@@ -61,7 +61,7 @@ interface QueryTableProps {
 }
 
 const openQuery = (id: number) => {
-  const url = `/superset/sqllab?queryId=${id}`;
+  const url = `/sqllab?queryId=${id}`;
   window.open(url);
 };
 
@@ -76,27 +76,42 @@ const QueryTable = ({
   const theme = useTheme();
   const dispatch = useDispatch();
 
+  const QUERY_HISTORY_TABLE_HEADERS_LOCALIZED = {
+    state: t('State'),
+    started: t('Started'),
+    duration: t('Duration'),
+    progress: t('Progress'),
+    rows: t('Rows'),
+    sql: t('SQL'),
+    results: t('Results'),
+    actions: t('Actions'),
+  };
+
   const setHeaders = (column: string) => {
     if (column === 'sql') {
       return column.toUpperCase();
     }
     return column.charAt(0).toUpperCase().concat(column.slice(1));
   };
+
   const columnsOfTable = useMemo(
     () =>
       columns.map(column => ({
         accessor: column,
-        Header: () => setHeaders(column),
+        Header:
+          QUERY_HISTORY_TABLE_HEADERS_LOCALIZED[column] || setHeaders(column),
         disableSortBy: true,
       })),
     [columns],
   );
 
-  const user = useSelector<SqlLabRootState, User>(state => state.sqlLab.user);
+  const user = useSelector<SqlLabRootState, User>(state => state.user);
 
   const data = useMemo(() => {
     const restoreSql = (query: QueryResponse) => {
-      dispatch(queryEditorSetAndSaveSql({ id: query.sqlEditorId }, query.sql));
+      dispatch(
+        queryEditorSetSql({ id: query.sqlEditorId }, query.sql, query.id),
+      );
     };
 
     const openQueryInNewTab = (query: QueryResponse) => {
@@ -200,7 +215,7 @@ const QueryTable = ({
             {q.db}
           </Button>
         );
-        q.started = moment(q.startDttm).format('HH:mm:ss');
+        q.started = moment(q.startDttm).format('L HH:mm:ss');
         q.querylink = (
           <Button
             buttonSize="small"
@@ -236,8 +251,7 @@ const QueryTable = ({
               modalBody={
                 <ResultSet
                   showSql
-                  user={user}
-                  query={query}
+                  queryId={query.id}
                   height={400}
                   displayLimit={displayLimit}
                   defaultQueryLimit={1000}
